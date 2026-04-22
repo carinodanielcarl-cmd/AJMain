@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AJGODZX Dashboard</title>
+    <style>
+        :root {
+            --accent: #00ffc8;
+            --bg: #0a0a0a;
+            --card: #151515;
+            --text: #ffffff;
+            --dim: #a0a0a0;
+        }
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        header {
+            width: 100%;
+            max-width: 800px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid var(--accent);
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+        h1 { margin: 0; color: var(--accent); font-size: 24px; letter-spacing: 2px; }
+        .status { font-size: 14px; color: var(--dim); }
+        .container {
+            width: 100%;
+            max-width: 800px;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 15px;
+        }
+        .card {
+            background-color: var(--card);
+            border-radius: 8px;
+            padding: 15px;
+            border-left: 4px solid var(--accent);
+            transition: transform 0.2s;
+        }
+        .card:hover { transform: translateY(-3px); }
+        .card-header { display: flex; justify-content: space-between; margin-bottom: 10px; }
+        .card-title { font-weight: bold; font-size: 16px; }
+        .card-value { color: var(--accent); font-weight: bold; }
+        .card-footer { font-size: 12px; color: var(--dim); margin-top: 10px; }
+        .btn-copy {
+            background-color: var(--accent);
+            color: #000;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>AJGODZX FINDS</h1>
+        <div class="status" id="status">Connecting to local API...</div>
+    </header>
+
+    <div class="container" id="container">
+        <!-- Findings will appear here -->
+    </div>
+
+    <script>
+        const API_URL = 'http://localhost:3000/recent';
+        
+        async function fetchFindings() {
+            try {
+                const response = await fetch(API_URL);
+                const data = await response.json();
+                if (data.ok) {
+                    renderFindings(data.findings);
+                    document.getElementById('status').innerText = 'Connected - Live Updates';
+                }
+            } catch (error) {
+                document.getElementById('status').innerText = 'Error: Could not reach API. Make sure server.js is running.';
+            }
+        }
+
+        function renderFindings(findings) {
+            const container = document.getElementById('container');
+            container.innerHTML = '';
+            
+            findings.reverse().forEach(item => {
+                const card = document.createElement('div');
+                card.className = 'card';
+                card.innerHTML = `
+                    <div class="card-header">
+                        <div class="card-title">${item.name}</div>
+                        <div class="card-value">${(item.value / 1000000).toFixed(1)}M</div>
+                    </div>
+                    <div>${item.tier}</div>
+                    <div class="card-footer">
+                        Job ID: ${item.job_id.substring(0, 15)}...
+                        <button class="btn-copy" onclick="navigator.clipboard.writeText('${item.job_id}')">COPY ID</button>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        setInterval(fetchFindings, 3000);
+        fetchFindings();
+    </script>
+</body>
+</html>
