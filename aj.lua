@@ -1,10 +1,5 @@
--- AJGODZX JOINER (Premium Polished v2.0.2)
--- Automatically fetches pings from npoint cloud and allows joining.
--- SAFE VISIBILITY: Automatically finds the best folder to show the UI.
-
--- [[ BOOT PROTECTION ]] --
-repeat task.wait() until game:IsLoaded() and game.Players.LocalPlayer
-local lp = game.Players.LocalPlayer
+-- AJGODZX PREMIUM V2 (Unified Scanner & Joiner System)
+-- Optimized for high-speed brainrot sniping with accurate identification
 
 local HttpService = game:GetService("HttpService")
 local CoreGui = game:GetService("CoreGui")
@@ -15,386 +10,482 @@ local SoundService = game:GetService("SoundService")
 local UserInputService = game:GetService("UserInputService")
 
 local UI_NAME = "AJGODZX_GUI"
+if CoreGui:FindFirstChild(UI_NAME) then CoreGui[UI_NAME]:Destroy() end
+if SoundService:FindFirstChild("AJNotifSound") then SoundService.AJNotifSound:Destroy() end
 
--- [[ SETTINGS ]] --
-local STEAL_BRAINROT_PLACE_ID = 74571154715577 -- Steal a Brainrot place ID
-local AJGODZX_SETTINGS = {
-    DATA_URL = "https://api.npoint.io/3b590339f6bef0db0dfd", 
-    RETRY_DELAY = 2,
-    THEME_ACCENT = Color3.fromRGB(0, 255, 200),
-}
+local lp = Players.LocalPlayer
+local STEAL_BRAINROT_PLACE_ID = 109983668079237
+_G.AJRunning = true
 
--- [[ UI PARENTING ]] --
-local function GetSafeParent()
-    local success, parent = pcall(function()
-        if gethui then return gethui() end
-        if CoreGui then return CoreGui end
-        return lp:WaitForChild("PlayerGui")
-    end)
-    return success and parent or lp:WaitForChild("PlayerGui")
-end
-
-local SafeParent = GetSafeParent()
-
--- Cleanup
-pcall(function()
-    if SafeParent:FindFirstChild(UI_NAME) then SafeParent[UI_NAME]:Destroy() end
-end)
-
--- [[ THEME ]] --
+-- ═══════════════════════════════════
+-- THEME & SETTINGS
+-- ═══════════════════════════════════
 local T = {
-    BgDark = Color3.fromRGB(5, 5, 5),
-    BgMid = Color3.fromRGB(12, 12, 12),
-    BgCard = Color3.fromRGB(20, 20, 20),
-    Sidebar = Color3.fromRGB(8, 8, 8),
-    Accent1 = Color3.fromRGB(0, 255, 200),
-    White = Color3.fromRGB(255, 255, 255),
-    TextDim = Color3.fromRGB(150, 150, 150),
-    Off = Color3.fromRGB(35, 35, 35),
-    Green = Color3.fromRGB(0, 255, 128),
-    Red = Color3.fromRGB(255, 60, 70),
-    Orange = Color3.fromRGB(255, 120, 0),
-    HighlightC = Color3.fromRGB(0, 255, 255),
-    MidlightC = Color3.fromRGB(0, 150, 255),
+    BgDark      = Color3.fromRGB(8, 12, 21),
+    BgMid       = Color3.fromRGB(12, 18, 32),
+    BgCard      = Color3.fromRGB(16, 24, 42),
+    BgCardHover = Color3.fromRGB(22, 32, 56),
+    Sidebar     = Color3.fromRGB(6, 10, 18),
+    Accent1     = Color3.fromRGB(60, 130, 246),
+    Accent2     = Color3.fromRGB(99, 179, 255),
+    White       = Color3.fromRGB(240, 245, 255),
+    TextDim     = Color3.fromRGB(120, 140, 175),
+    Off         = Color3.fromRGB(30, 36, 52),
+    Green       = Color3.fromRGB(45, 210, 110),
+    Red         = Color3.fromRGB(220, 60, 70),
+    HighlightC  = Color3.fromRGB(255, 75, 75),
+    MidlightC   = Color3.fromRGB(80, 175, 255),
+    Orange      = Color3.fromRGB(255, 165, 0)
 }
 
 local userSettings = {
     AutoJoin = false,
+    AutoJoinRetries = 3,
     PlaySound = true,
+    ToggleKey = "RightShift",
+    UseWhitelist = false,
+    Whitelist = {},
+    HighlightsOnly = false
 }
 
--- [[ UI FOUNDATION ]] --
-local Gui = Instance.new("ScreenGui")
-Gui.Name = UI_NAME
-Gui.Parent = SafeParent
-Gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+local CONFIG_FILE = "AJGODZX_Config.json"
+local SHARED_URL = "https://api.npoint.io/3b590339f6bef0db0dfd"
 
-local Main = Instance.new("CanvasGroup", Gui)
-Main.Size = UDim2.new(0, 606, 0, 365)
-Main.Position = UDim2.new(0.5, -303, 0.5, -182)
-Main.BackgroundColor3 = T.BgDark
-Main.BorderSizePixel = 0
-Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 9)
-
-local MainScale = Instance.new("UIScale", Main)
-MainScale.Scale = 1.0
-
--- Draggable
-local dragging, dragInput, dragStart, startPos
-Main.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        dragging = true; dragStart = input.Position; startPos = Main.Position
-        input.Changed:Connect(function() if input.UserInputState == Enum.UserInputState.End then dragging = false end end)
-    end
-end)
-UserInputService.InputChanged:Connect(function(input)
-    if (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) and dragging then
-        local delta = input.Position - dragStart
-        Main.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+-- [[ PERSISTENCE ]] --
+pcall(function()
+    if isfile and readfile and isfile(CONFIG_FILE) then
+        local saved = HttpService:JSONDecode(readfile(CONFIG_FILE))
+        if type(saved) == "table" then
+            for k, v in pairs(saved) do
+                if k == "Whitelist" and type(v) == "table" then
+                    for wk, wv in pairs(v) do userSettings.Whitelist[wk] = wv end
+                else
+                    userSettings[k] = v
+                end
+            end
+        end
     end
 end)
 
--- [[ SIDEBAR ]] --
-local Sidebar = Instance.new("Frame", Main)
-Sidebar.BackgroundColor3 = T.Sidebar
-Sidebar.Position = UDim2.new(0, 0, 0, 65)
-Sidebar.Size = UDim2.new(0, 155, 1, -65)
-Instance.new("UICorner", Sidebar).CornerRadius = UDim.new(0, 9)
-
-local function createFilterBtn(text, yPos, filterKey)
-    local btn = Instance.new("TextButton", Sidebar)
-    btn.Position = UDim2.new(0, 10, 0, yPos)
-    btn.Size = UDim2.new(0, 135, 0, 35)
-    btn.BackgroundColor3 = T.BgCard
-    btn.Text = "  " .. text
-    btn.TextColor3 = T.White
-    btn.Font = Enum.Font.GothamBold
-    btn.TextSize = 12
-    btn.TextXAlignment = Enum.TextXAlignment.Left
-    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
-    local stroke = Instance.new("UIStroke", btn)
-    stroke.Color = (filterKey == "all") and T.Accent1 or T.Off
-    return btn
-end
-
-createFilterBtn("📋 All Logs", 10, "all")
-createFilterBtn("🏆 Highlights", 50, "hl")
-createFilterBtn("⭐ Midlights", 90, "ml")
-
-local AutoJoinBtn = Instance.new("TextButton", Sidebar)
-AutoJoinBtn.Position = UDim2.new(0, 10, 0, 180)
-AutoJoinBtn.Size = UDim2.new(0, 135, 0, 38)
-AutoJoinBtn.BackgroundColor3 = T.BgCard
-AutoJoinBtn.Text = "⚡ AUTO JOIN OFF"
-AutoJoinBtn.TextColor3 = T.White
-AutoJoinBtn.Font = Enum.Font.GothamBold
-AutoJoinBtn.TextSize = 11
-Instance.new("UICorner", AutoJoinBtn).CornerRadius = UDim.new(0, 8)
-Instance.new("UIStroke", AutoJoinBtn).Color = T.Red
-
-AutoJoinBtn.MouseButton1Click:Connect(function()
-    userSettings.AutoJoin = not userSettings.AutoJoin
-    AutoJoinBtn.Text = userSettings.AutoJoin and "✅ AUTO JOIN ON" or "⚡ AUTO JOIN OFF"
-    AutoJoinBtn.BackgroundColor3 = userSettings.AutoJoin and T.Green or T.BgCard
+task.spawn(function()
+    local lastSave = HttpService:JSONEncode(userSettings)
+    while _G.AJRunning do
+        task.wait(3)
+        pcall(function()
+            local current = HttpService:JSONEncode(userSettings)
+            if current ~= lastSave then
+                if writefile then writefile(CONFIG_FILE, current) end
+                lastSave = current
+            end
+        end)
+    end
 end)
 
--- [[ HEADER ]] --
-local Header = Instance.new("TextLabel", Main)
-Header.Position = UDim2.new(0, 20, 0, 15)
-Header.Size = UDim2.new(0, 200, 0, 30)
-Header.BackgroundTransparency = 1
-Header.Font = Enum.Font.GothamBold
-Header.Text = "AJGODZX"
-Header.TextColor3 = T.Accent1
-Header.TextSize = 24
-Header.TextXAlignment = Enum.TextXAlignment.Left
+-- [[ BRAINROT LIST ]] --
+local allBrainrots = {
+    "Los Nooo My Hotspotsitos", "Serafinna Medusella", "La Grande Combinassion", "La Easter Grande", "Rang Ring Bus", "Guest 666",
+    "Los Mi Gatitos", "Los Chicleteiras", "Noo My Eggs", "67", "Donkeyturbo Express", "Mariachi Corazoni", "Los Burritos",
+    "Los 25", "Tacorillo Crocodillo", "Swag Soda", "Noo my Heart", "Chimnino", "Los Combinasionas", "Chicleteira Noelteira",
+    "Fishino Clownino", "Baskito", "Tacorita Bicicleta", "Los Sweethearts", "Spinny Hammy", "Nuclearo Dinosauro", "Las Sis",
+    "DJ Panda", "Chicleteira Cupideira", "La Karkerkar Combinasion", "Chillin Chili", "Chipso and Queso", "Money Money Reindeer",
+    "Money Money Puggy", "Churrito Bunnito", "Celularcini Viciosini", "Los Planitos", "Los Mobilis", "Los 67",
+    "Mieteteira Bicicleteira", "Tuff Toucan", "La Spooky Grande", "Los Spooky Combinasionas", "Cigno Fulgoro", "Los Candies",
+    "Los Hotspositos", "Los Jolly Combinasionas", "Los Cupids", "Los Puggies", "W or L", "Tralalalaledon",
+    "La Extinct Grande Combinasion", "Tralaledon", "La Jolly Grande", "Los Primos", "Bacuru and Egguru", "Eviledon",
+    "Los Tacoritas", "Lovin Rose", "Tang Tang Kelentang", "Ketupat Kepat", "Los Bros", "Tictac Sahur", "La Romantic Grande",
+    "Gingerat Gerat", "Orcaledon", "La Lucky Grande", "Ketchuru and Masturu", "Jolly Jolly Sahur", "Garama and Madundung",
+    "Rosetti Tualetti", "Nacho Spyder", "Hopilikalika Hopilikalako", "Festive 67", "Sammyni Fattini", "Love Love Bear",
+    "La Ginger Sekolah", "Spooky and Pumpky", "Boppin Bunny", "Lavadorito Spinito", "La Food Combinasion", "Los Spaghettis",
+    "La Casa Boo", "Fragrama and Chocrama", "Los Sekolahs", "Foxini Lanternini", "La Secret Combinasion", "Los Amigos",
+    "Reinito Sleighito", "Ketupat Bros", "Burguro and Fryuro", "Cooki and Milki", "Capitano Moby", "Rosey and Teddy",
+    "Popcuru and Fizzuru", "Hydra Bunny", "Celestial Pegasus", "Cerberus", "La Supreme Combinasion", "Dragon Cannelloni",
+    "Dragon Gingerini", "Headless Horseman", "Hydra Dragon Cannelloni", "Griffin", "Skibidi Toilet", "Meowl",
+    "Strawberry Elephant", "La Vacca Saturno Saturnita", "Pandanini Frostini", "Bisonte Giuppitere", "Blackhole Goat",
+    "Jackorilla", "Agarrini Ia Palini", "Chachechi", "Karkerkar Kurkur", "Los Tortus", "Los Matteos", "Sammyni Spyderini",
+    "Trenostruzzo Turbo 4000", "Chimpanzini Spiderini", "Boatito Auratito", "Fragola La La La", "Dul Dul Dul",
+    "La Vacca Prese Presente", "Frankentteo", "Los Trios", "Karker Sahur", "Torrtuginni Dragonfrutini (Lucky Block)",
+    "Los Tralaleritos", "Zombie Tralala", "La Cucaracha", "Vulturino Skeletono", "Guerriro Digitale", "Extinct Tralalero",
+    "Yess My Examine", "Extinct Matteo", "Las Tralaleritas", "Rocco Disco", "Reindeer Tralala", "Las Vaquitas Saturnitas",
+    "Pumpkin Spyderini", "Job Job Job Sahur", "Los Karkeritos", "Graipuss Medussi", "Santteo", "Fishboard", "Buntteo",
+    "La Vacca Jacko Linterino", "Triplito Tralaleritos", "Trickolino", "Paradiso Axolottino", "GOAT", "Giftini Spyderini",
+    "Los Spyderinis", "Love Love Love Sahur", "Perrito Burrito", "1x1x1x1", "Los Cucarachas", "Easter Easter Sahur",
+    "Please My Present", "Cuadramat and Pakrahmatmamat", "Los Jobcitos", "Nooo My Hotspot", "Pot Hotspot (Lucky Block)",
+    "Noo My Examine", "Telemorte", "La Sahur Combinasion", "List List List Sahur", "Bunny Bunny Bunny Sahur", "To To To Sahur",
+    "Pirulitoita Bicicletaire", "25", "Santa Hotspot", "Horegini Boom", "Quesadilla Crocodila", "Pot Pumpkin", "Naughty Naughty",
+    "Cupid Cupid Sahur", "Ho Ho Ho Sahur", "Mi Gatito", "Chicleteira Bicicleteira", "Eid Eid Eid Sahur", "Cupid Hotspot",
+    "Spaghetti Tualetti (Lucky Block)", "Esok Sekolah (Lucky Block)", "Quesadillo Vampiro", "Brunito Marsito", "Chill Puppy",
+    "Burrito Bandito", "Chicleteirina Bicicleteirina", "Granny", "Los Bunitos", "Los Quesadillas", "Bunito Bunito Spinito",
+    "Noo My Candy"
+}
 
-local StatusIndicator = Instance.new("Frame", Main)
-StatusIndicator.Size = UDim2.new(0, 8, 0, 8)
-StatusIndicator.Position = UDim2.new(0, 20, 0, 48)
-StatusIndicator.BackgroundColor3 = T.Red
-Instance.new("UICorner", StatusIndicator).CornerRadius = UDim.new(1, 0)
+-- [[ UTILS ]] --
+local NotifSound = Instance.new("Sound")
+NotifSound.Name = "AJNotifSound"
+NotifSound.SoundId = "rbxassetid://4590662766"
+NotifSound.Volume = 1
+NotifSound.Parent = SoundService
 
-local StatusText = Instance.new("TextLabel", Main)
-StatusText.Position = UDim2.new(0, 35, 0, 42)
-StatusText.BackgroundTransparency = 1
-StatusText.Text = "Connecting to phone bot..."
-StatusText.TextColor3 = T.TextDim
-StatusText.TextSize = 12
-StatusText.Font = Enum.Font.GothamMedium
-StatusText.TextXAlignment = Enum.TextXAlignment.Left
-
--- [[ CONTENT AREA ]] --
-local Content = Instance.new("ScrollingFrame", Main)
-Content.Position = UDim2.new(0, 165, 0, 65)
-Content.Size = UDim2.new(1, -175, 1, -75)
-Content.BackgroundTransparency = 1
-Content.BorderSizePixel = 0
-Content.ScrollBarThickness = 2
-Content.AutomaticCanvasSize = Enum.AutomaticSize.Y
-
-local LogLayout = Instance.new("UIListLayout", Content)
-LogLayout.Padding = UDim.new(0, 8)
-LogLayout.SortOrder = Enum.SortOrder.LayoutOrder
-
--- [[ JOIN SYSTEM ]] --
-local lastJoinedId = nil
-
-local function showJoinStatus(text, statusType)
-    if statusType == "success" then
-        StatusIndicator.BackgroundColor3 = T.Green
-    elseif statusType == "error" then
-        StatusIndicator.BackgroundColor3 = T.Red
-    elseif statusType == "loading" then
-        StatusIndicator.BackgroundColor3 = T.Orange
-    end
-    StatusText.Text = text
-    print("[AJGODZX] " .. text)
+local function playNotifSound()
+    if userSettings.PlaySound then NotifSound:Play() end
 end
 
-local function joinByJobId(jobId, placeId)
-    if not jobId or type(jobId) ~= "string" or jobId == "" then
-        showJoinStatus("❌ Invalid JobId!", "error")
-        return
-    end
-    
-    local pid = tonumber(placeId) or STEAL_BRAINROT_PLACE_ID
-    
-    showJoinStatus("🔄 Teleporting to " .. jobId:sub(1,8) .. "...", "loading")
-    print("[AJGODZX] TeleportToPlaceInstance(" .. tostring(pid) .. ", " .. jobId .. ")")
-    
-    local ok, err = pcall(function()
-        TeleportService:TeleportToPlaceInstance(pid, jobId, lp)
-    end)
-    
-    if ok then
-        showJoinStatus("✅ Teleporting...", "success")
-        lastJoinedId = jobId
-    else
-        showJoinStatus("❌ " .. tostring(err), "error")
-        warn("[AJGODZX] Teleport error: " .. tostring(err))
-    end
-end
-
--- [[ LOG LOGIC ]] --
 local function formatNumber(n)
-    if n >= 1000000 then return string.format("%.1fM", n/1000000) end
-    if n >= 1000 then return string.format("%.1fK", n/1000) end
+    n = tonumber(n) or 0
+    if n >= 1000000 then
+        return (string.format("%.1fM", n / 1000000)):gsub("%.0M", "M")
+    elseif n >= 1000 then
+        return (string.format("%.1fK", n / 1000)):gsub("%.0K", "K")
+    end
     return tostring(n)
 end
 
-local function addLogEntry(data)
-    local LogItem = Instance.new("Frame", Content)
-    LogItem.BackgroundColor3 = T.BgCard
-    LogItem.Size = UDim2.new(1, -10, 0, 45)
-    Instance.new("UICorner", LogItem).CornerRadius = UDim.new(0, 8)
+-- [[ GUI CONSTRUCTION ]] --
+local Gui = Instance.new("ScreenGui", CoreGui)
+Gui.Name = UI_NAME
+
+local Main = Instance.new("Frame", Gui)
+Main.Size = UDim2.new(0, 580, 0, 380)
+Main.Position = UDim2.new(0.5, -290, 1.5, 0)
+Main.BackgroundColor3 = T.BgDark
+Main.BorderSizePixel = 0
+Main.ClipsDescendants = true
+Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 12)
+
+local MainStroke = Instance.new("UIStroke", Main)
+MainStroke.Thickness = 2
+MainStroke.Color = T.Accent1
+MainStroke.Transparency = 0.1
+
+local Sidebar = Instance.new("Frame", Main)
+Sidebar.Size = UDim2.new(0, 155, 1, 0)
+Sidebar.BackgroundColor3 = T.Sidebar
+Sidebar.BorderSizePixel = 0
+Instance.new("UICorner", Sidebar).CornerRadius = UDim.new(0, 12)
+
+local Logo = Instance.new("TextLabel", Sidebar)
+Logo.Size = UDim2.new(1, 0, 0, 45)
+Logo.Position = UDim2.new(0, 0, 0, 8)
+Logo.BackgroundTransparency = 1
+Logo.Text = "AJGODZX"
+Logo.Font = Enum.Font.GothamBlack
+Logo.TextSize = 24
+Logo.TextColor3 = T.Accent2
+
+local LogoSub = Instance.new("TextLabel", Sidebar)
+LogoSub.Size = UDim2.new(1, 0, 0, 14)
+LogoSub.Position = UDim2.new(0, 0, 0, 42)
+LogoSub.BackgroundTransparency = 1
+LogoSub.Text = "P R E M I U M"
+LogoSub.Font = Enum.Font.Gotham
+LogoSub.TextSize = 9
+LogoSub.TextColor3 = T.TextDim
+
+-- Tab Pages
+local LogsPage = Instance.new("Frame", Main)
+LogsPage.Size = UDim2.new(1, -155, 1, 0)
+LogsPage.Position = UDim2.new(0, 155, 0, 0)
+LogsPage.BackgroundTransparency = 1
+
+local SettingsPage = Instance.new("Frame", Main)
+SettingsPage.Size = UDim2.new(1, -155, 1, 0)
+SettingsPage.Position = UDim2.new(0, 155, 0, 0)
+SettingsPage.BackgroundTransparency = 1
+SettingsPage.Visible = false
+
+local WhitelistPage = Instance.new("Frame", Main)
+WhitelistPage.Size = UDim2.new(1, -155, 1, 0)
+WhitelistPage.Position = UDim2.new(0, 155, 0, 0)
+WhitelistPage.BackgroundTransparency = 1
+WhitelistPage.Visible = false
+
+-- [[ TAB SYSTEM ]] --
+local activeTab = "logs"
+local tabButtons = {}
+
+local function makeTabBtn(icon, text, yPos, key)
+    local btn = Instance.new("TextButton", Sidebar)
+    btn.Size = UDim2.new(1, -20, 0, 36)
+    btn.Position = UDim2.new(0, 10, 0, yPos)
+    btn.BackgroundColor3 = T.BgCard
+    btn.BackgroundTransparency = key == "logs" and 0 or 1
+    btn.Text = ""
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
     
-    local bar = Instance.new("Frame", LogItem)
-    bar.Size = UDim2.new(0, 4, 0.7, 0)
-    bar.Position = UDim2.new(0, 0, 0.15, 0)
-    bar.BackgroundColor3 = (data.tier == "Highlights") and T.HighlightC or T.MidlightC
+    local lbl = Instance.new("TextLabel", btn)
+    lbl.Size = UDim2.new(1, -15, 1, 0)
+    lbl.Position = UDim2.new(0, 15, 0, 0)
+    lbl.BackgroundTransparency = 1
+    lbl.TextXAlignment = Enum.TextXAlignment.Left
+    lbl.Text = icon .. "  " .. text
+    lbl.Font = Enum.Font.GothamSemibold
+    lbl.TextSize = 12
+    lbl.TextColor3 = key == "logs" and T.White or T.TextDim
+    
+    tabButtons[key] = {btn = btn, lbl = lbl}
+    return btn
+end
+
+local tLogs = makeTabBtn("📋", "Logs", 90, "logs")
+local tSettings = makeTabBtn("⚙️", "Settings", 132, "settings")
+local tWhitelist = makeTabBtn("🛡️", "Whitelist", 174, "whitelist")
+
+local function switchTab(toKey)
+    activeTab = toKey
+    LogsPage.Visible = toKey == "logs"
+    SettingsPage.Visible = toKey == "settings"
+    WhitelistPage.Visible = toKey == "whitelist"
+    for k, v in pairs(tabButtons) do
+        local act = k == toKey
+        TweenService:Create(v.btn, TweenInfo.new(0.2), {BackgroundTransparency = act and 0 or 1}):Play()
+        v.lbl.TextColor3 = act and T.White or T.TextDim
+    end
+end
+
+tLogs.MouseButton1Click:Connect(function() switchTab("logs") end)
+tSettings.MouseButton1Click:Connect(function() switchTab("settings") end)
+tWhitelist.MouseButton1Click:Connect(function() switchTab("whitelist") end)
+
+-- [[ LOGS CONTENT ]] --
+local TopBar = Instance.new("Frame", LogsPage)
+TopBar.Size = UDim2.new(1, 0, 0, 55)
+TopBar.BackgroundTransparency = 1
+
+local ajPanel = Instance.new("Frame", TopBar)
+ajPanel.Size = UDim2.new(1, -30, 0, 36)
+ajPanel.Position = UDim2.new(0, 15, 0, 10)
+ajPanel.BackgroundColor3 = T.BgCard
+Instance.new("UICorner", ajPanel).CornerRadius = UDim.new(0, 8)
+
+local ajLbl = Instance.new("TextLabel", ajPanel)
+ajLbl.Size = UDim2.new(0, 150, 1, 0)
+ajLbl.Position = UDim2.new(0, 12, 0, 0)
+ajLbl.BackgroundTransparency = 1
+ajLbl.Text = "AutoJoin Highest Value"
+ajLbl.Font = Enum.Font.GothamBold
+ajLbl.TextXAlignment = Enum.TextXAlignment.Left
+ajLbl.TextSize = 12
+ajLbl.TextColor3 = T.White
+
+local ajTrack = Instance.new("TextButton", ajPanel)
+ajTrack.Size = UDim2.new(0, 42, 0, 22)
+ajTrack.Position = UDim2.new(1, -56, 0.5, -11)
+ajTrack.BackgroundColor3 = userSettings.AutoJoin and T.Accent1 or T.Off
+ajTrack.Text = ""
+Instance.new("UICorner", ajTrack).CornerRadius = UDim.new(1, 0)
+
+local ajDot = Instance.new("Frame", ajTrack)
+ajDot.Size = UDim2.new(0, 16, 0, 16)
+ajDot.Position = userSettings.AutoJoin and UDim2.new(1, -19, 0, 3) or UDim2.new(0, 3, 0, 3)
+ajDot.BackgroundColor3 = T.White
+Instance.new("UICorner", ajDot).CornerRadius = UDim.new(1, 0)
+
+ajTrack.MouseButton1Click:Connect(function()
+    userSettings.AutoJoin = not userSettings.AutoJoin
+    local on = userSettings.AutoJoin
+    TweenService:Create(ajDot, TweenInfo.new(0.15), {Position = on and UDim2.new(1, -19, 0, 3) or UDim2.new(0, 3, 0, 3)}):Play()
+    TweenService:Create(ajTrack, TweenInfo.new(0.15), {BackgroundColor3 = on and T.Accent1 or T.Off}):Play()
+end)
+
+local Content = Instance.new("ScrollingFrame", LogsPage)
+Content.Size = UDim2.new(1, 0, 1, -55)
+Content.Position = UDim2.new(0, 0, 0, 52)
+Content.BackgroundTransparency = 1
+Content.BorderSizePixel = 0
+Content.ScrollBarThickness = 2
+Content.ScrollBarImageColor3 = T.Off
+
+local CLayout = Instance.new("UIListLayout", Content)
+CLayout.Padding = UDim.new(0, 6)
+CLayout.SortOrder = Enum.SortOrder.LayoutOrder
+
+Instance.new("UIPadding", Content).PaddingLeft = UDim.new(0, 15)
+Instance.new("UIPadding", Content).PaddingRight = UDim.new(0, 15)
+
+CLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    Content.CanvasSize = UDim2.new(0, 0, 0, CLayout.AbsoluteContentSize.Y + 10)
+end)
+
+-- [[ LOG ENTRY ]] --
+local lastLogId = nil
+local function addLogEntry(data)
+    if data.id == lastLogId then return end
+    lastLogId = data.id
+    
+    local isHL = data.tier == "Highlights"
+    local card = Instance.new("Frame", Content)
+    card.Size = UDim2.new(1, 0, 0, 55)
+    card.BackgroundColor3 = T.BgCard
+    card.LayoutOrder = -os.time()
+    Instance.new("UICorner", card).CornerRadius = UDim.new(0, 8)
+    
+    local bar = Instance.new("Frame", card)
+    bar.Size = UDim2.new(0, 3, 0.6, 0)
+    bar.Position = UDim2.new(0, 0, 0.2, 0)
+    bar.BackgroundColor3 = isHL and T.HighlightC or T.MidlightC
     Instance.new("UICorner", bar).CornerRadius = UDim.new(1, 0)
 
-    local Left = Instance.new("Frame", LogItem)
-    Left.BackgroundTransparency = 1
-    Left.Size = UDim2.new(0.65, 0, 1, 0)
-    Left.Position = UDim2.new(0, 12, 0, 0)
+    local nameL = Instance.new("TextLabel", card)
+    nameL.Size = UDim2.new(1, -135, 0, 20)
+    nameL.Position = UDim2.new(0, 12, 0, 8)
+    nameL.BackgroundTransparency = 1
+    nameL.TextXAlignment = Enum.TextXAlignment.Left
+    nameL.Text = data.name or "Unknown"
+    nameL.Font = Enum.Font.GothamBold
+    nameL.TextSize = 13
+    nameL.TextColor3 = T.White
+    
+    local valL = Instance.new("TextLabel", card)
+    valL.Size = UDim2.new(1, -135, 0, 14)
+    valL.Position = UDim2.new(0, 12, 0, 28)
+    valL.BackgroundTransparency = 1
+    valL.TextXAlignment = Enum.TextXAlignment.Left
+    valL.Text = formatNumber(data.value or 0) .. "  •  " .. (data.mutation or "Normal") .. "  •  " .. (data.players or "0/0")
+    valL.Font = Enum.Font.Gotham
+    valL.TextSize = 10
+    valL.TextColor3 = isHL and T.HighlightC or T.MidlightC
 
-    local Name = Instance.new("TextLabel", Left)
-    Name.Size = UDim2.new(1, 0, 0.6, 0)
-    Name.Position = UDim2.new(0, 0, 0, 2)
-    Name.BackgroundTransparency = 1
-    Name.Font = Enum.Font.GothamBold
-    Name.Text = (data.name or "Unknown")
-    Name.TextColor3 = T.White
-    Name.TextSize = 13
-    Name.TextXAlignment = Enum.TextXAlignment.Left
+    local jBtn = Instance.new("TextButton", card)
+    jBtn.Size = UDim2.new(0, 55, 0, 28)
+    jBtn.Position = UDim2.new(1, -65, 0.5, -14)
+    jBtn.BackgroundColor3 = T.Accent1
+    jBtn.Text = "JOIN"
+    jBtn.Font = Enum.Font.GothamBold
+    jBtn.TextSize = 11
+    jBtn.TextColor3 = T.White
+    Instance.new("UICorner", jBtn).CornerRadius = UDim.new(0, 6)
 
-    local ValueLabel = Instance.new("TextLabel", Left)
-    ValueLabel.Size = UDim2.new(1, 0, 0.4, 0)
-    ValueLabel.Position = UDim2.new(0, 0, 0.6, -2)
-    ValueLabel.BackgroundTransparency = 1
-    ValueLabel.Font = Enum.Font.GothamMedium
-    ValueLabel.Text = formatNumber(data.value or 0) .. " · " .. (data.mutation or "Normal")
-    ValueLabel.TextColor3 = (data.tier == "Highlights") and T.HighlightC or T.MidlightC
-    ValueLabel.TextSize = 10
-    ValueLabel.TextXAlignment = Enum.TextXAlignment.Left
-
-    local Right = Instance.new("Frame", LogItem)
-    Right.BackgroundTransparency = 1
-    Right.Size = UDim2.new(0.35, 0, 1, 0)
-    Right.Position = UDim2.new(0.65, 0, 0, 0)
-
-    local JoinBtn = Instance.new("TextButton", Right)
-    JoinBtn.Size = UDim2.new(0, 55, 0, 26)
-    JoinBtn.Position = UDim2.new(0.5, -60, 0.5, -13)
-    JoinBtn.BackgroundColor3 = T.Accent1
-    JoinBtn.Text = "JOIN"
-    JoinBtn.Font = Enum.Font.GothamBold
-    JoinBtn.TextColor3 = T.White
-    JoinBtn.TextSize = 10
-    Instance.new("UICorner", JoinBtn).CornerRadius = UDim.new(0, 6)
-
-    local CopyBtn = Instance.new("TextButton", Right)
-    CopyBtn.Size = UDim2.new(0, 50, 0, 26)
-    CopyBtn.Position = UDim2.new(0.5, 5, 0.5, -13)
-    CopyBtn.BackgroundColor3 = T.Orange
-    CopyBtn.Text = "COPY"
-    CopyBtn.Font = Enum.Font.GothamBold
-    CopyBtn.TextColor3 = T.White
-    CopyBtn.TextSize = 9
-    Instance.new("UICorner", CopyBtn).CornerRadius = UDim.new(0, 6)
-
-    JoinBtn.MouseButton1Click:Connect(function()
-        if data.job_id then
-            JoinBtn.Text = "..."
-            JoinBtn.BackgroundColor3 = T.Orange
-            joinByJobId(data.job_id, data.place_id)
-            task.delay(2, function()
-                JoinBtn.Text = "JOIN"
-                JoinBtn.BackgroundColor3 = T.Accent1
-            end)
-        else
-            showJoinStatus("❌ No Job ID!", "error")
-        end
+    jBtn.MouseButton1Click:Connect(function()
+        TeleportService:TeleportToPlaceInstance(STEAL_BRAINROT_PLACE_ID, data.job_id, lp)
     end)
     
-    CopyBtn.MouseButton1Click:Connect(function()
-        if data.job_id and setclipboard then
-            setclipboard(data.job_id)
-            CopyBtn.Text = "✓"
-            CopyBtn.BackgroundColor3 = T.Green
-            task.delay(1.5, function()
-                CopyBtn.Text = "COPY"
-                CopyBtn.BackgroundColor3 = T.Orange
-            end)
-        end
-    end)
+    playNotifSound()
 end
 
 -- [[ DATA SYNC ]] --
-local seenIds = {}
-local isFirstRun = true
-
-local function handleData(list)
-    local newFindings = {}
-    for _, d in ipairs(list) do
-        local logId = d.id or (d.job_id and d.job_id .. "_" .. (d.name or ""))
-        if logId and logId ~= "" and not seenIds[logId] then
-            seenIds[logId] = true
-            table.insert(newFindings, d)
-        end
-    end
-    
-    -- First run: just mark everything as seen, don't display old logs
-    if isFirstRun then
-        isFirstRun = false
-        StatusText.Text = "Live mode active (" .. #newFindings .. " old skipped)"
-        print("[AJGODZX] Skipped " .. #newFindings .. " old findings, waiting for new ones...")
-        return
-    end
-    
-    -- Show ALL new findings (no timestamp filter - phone/PC clocks can be out of sync)
-    for _, d in ipairs(newFindings) do
-        print("[AJGODZX] NEW FIND: " .. tostring(d.name) .. " | JobId: " .. tostring(d.job_id))
-        addLogEntry(d)
-        if userSettings.AutoJoin and d.job_id then
-            joinByJobId(d.job_id, d.place_id)
-        end
-    end
-end
-
 task.spawn(function()
-    while true do
-        local ok, err = pcall(function()
-            local reqUrl = AJGODZX_SETTINGS.DATA_URL .. "?t=" .. tostring(tick())
-            local rawBody
-            
-            -- Multi-executor HTTP support
-            if syn and syn.request then
-                local resp = syn.request({Url = reqUrl, Method = "GET"})
-                rawBody = resp and resp.Body
-            elseif request then
-                local resp = request({Url = reqUrl, Method = "GET"})
-                rawBody = resp and resp.Body
-            elseif http_request then
-                local resp = http_request({Url = reqUrl, Method = "GET"})
-                rawBody = resp and resp.Body
-            else
-                rawBody = game:HttpGet(reqUrl, true)
-            end
-            
-            if rawBody and rawBody ~= "" then
-                local res = HttpService:JSONDecode(rawBody)
-                -- npoint returns {ok: true, findings: [...]} or just {findings: [...]}
-                local list = nil
-                if type(res) == "table" then
-                    if res.findings and type(res.findings) == "table" then
-                        list = res.findings
-                    elseif #res > 0 then
-                        list = res
+    local seenIds = {}
+    while _G.AJRunning do
+        pcall(function()
+            local res = game:HttpGet(SHARED_URL .. "?t=" .. tick())
+            local data = HttpService:JSONDecode(res)
+            if data and data.findings then
+                for _, finding in ipairs(data.findings) do
+                    if not seenIds[finding.id] then
+                        seenIds[finding.id] = true
+                        
+                        -- Whitelist filter
+                        local allowed = true
+                        if userSettings.UseWhitelist then
+                            allowed = userSettings.Whitelist[finding.base_name] or false
+                        end
+                        
+                        if allowed then
+                            addLogEntry(finding)
+                            if userSettings.AutoJoin then
+                                TeleportService:TeleportToPlaceInstance(STEAL_BRAINROT_PLACE_ID, finding.job_id, lp)
+                            end
+                        end
                     end
-                end
-                
-                if list then
-                    StatusIndicator.BackgroundColor3 = T.Green
-                    if not isFirstRun then
-                        StatusText.Text = "Live (" .. #list .. " total finds)"
-                    end
-                    handleData(list)
-                else
-                    StatusIndicator.BackgroundColor3 = T.Green
-                    StatusText.Text = "Connected (no finds yet)"
                 end
             end
         end)
-        if not ok then
-            StatusIndicator.BackgroundColor3 = T.Red
-            StatusText.Text = "Error: " .. tostring(err):sub(1, 40)
-            warn("[AJGODZX] Fetch error: " .. tostring(err))
-        end
-        task.wait(AJGODZX_SETTINGS.RETRY_DELAY)
+        task.wait(2)
     end
 end)
+
+-- Intro Animation
+TweenService:Create(Main, TweenInfo.new(0.5, Enum.EasingStyle.Back), {Position = UDim2.new(0.5, -290, 0.5, -190)}):Play()
+
+-- [[ SETTINGS PAGE GENERATION ]] --
+local function makeToggle(parent, text, key)
+    local f = Instance.new("Frame", parent)
+    f.Size = UDim2.new(1, -30, 0, 42)
+    f.Position = UDim2.new(0, 15, 0, 0)
+    f.BackgroundColor3 = T.BgCard
+    Instance.new("UICorner", f).CornerRadius = UDim.new(0, 8)
+    Instance.new("UIListLayout", parent).Padding = UDim.new(0, 8)
+    
+    local lbl = Instance.new("TextLabel", f)
+    lbl.Size = UDim2.new(1, -65, 1, 0)
+    lbl.Position = UDim2.new(0, 14, 0, 0)
+    lbl.BackgroundTransparency = 1
+    lbl.TextXAlignment = Enum.TextXAlignment.Left
+    lbl.Text = text
+    lbl.Font = Enum.Font.GothamSemibold
+    lbl.TextSize = 13
+    lbl.TextColor3 = T.White
+    
+    local track = Instance.new("TextButton", f)
+    track.Size = UDim2.new(0, 42, 0, 22)
+    track.Position = UDim2.new(1, -56, 0.5, -11)
+    track.BackgroundColor3 = userSettings[key] and T.Accent1 or T.Off
+    track.Text = ""
+    Instance.new("UICorner", track).CornerRadius = UDim.new(1, 0)
+    
+    local dot = Instance.new("Frame", track)
+    dot.Size = UDim2.new(0, 16, 0, 16)
+    dot.Position = userSettings[key] and UDim2.new(1, -19, 0, 3) or UDim2.new(0, 3, 0, 3)
+    dot.BackgroundColor3 = T.White
+    Instance.new("UICorner", dot).CornerRadius = UDim.new(1, 0)
+    
+    track.MouseButton1Click:Connect(function()
+        userSettings[key] = not userSettings[key]
+        local on = userSettings[key]
+        TweenService:Create(dot, TweenInfo.new(0.15), {Position = on and UDim2.new(1, -19, 0, 3) or UDim2.new(0, 3, 0, 3)}):Play()
+        TweenService:Create(track, TweenInfo.new(0.15), {BackgroundColor3 = on and T.Accent1 or T.Off}):Play()
+    end)
+end
+
+local SScroll = Instance.new("ScrollingFrame", SettingsPage)
+SScroll.Size = UDim2.new(1, 0, 1, 0)
+SScroll.BackgroundTransparency = 1
+SScroll.BorderSizePixel = 0
+Instance.new("UIPadding", SScroll).PaddingTop = UDim.new(0, 15)
+
+makeToggle(SScroll, "Play Notification Sound", "PlaySound")
+makeToggle(SScroll, "Highlights Only Mode", "HighlightsOnly")
+makeToggle(SScroll, "Use Whitelist Filter", "UseWhitelist")
+
+-- [[ WHITELIST PAGE GENERATION ]] --
+local WLScroll = Instance.new("ScrollingFrame", WhitelistPage)
+WLScroll.Size = UDim2.new(1, 0, 1, 0)
+WLScroll.BackgroundTransparency = 1
+WLScroll.BorderSizePixel = 0
+Instance.new("UIListLayout", WLScroll).Padding = UDim.new(0, 5)
+Instance.new("UIPadding", WLScroll).PaddingTop = UDim.new(0, 15)
+Instance.new("UIPadding", WLScroll).PaddingLeft = UDim.new(0, 15)
+
+for _, v in ipairs(allBrainrots) do
+    local f = Instance.new("Frame", WLScroll)
+    f.Size = UDim2.new(1, -30, 0, 34)
+    f.BackgroundColor3 = T.BgCard
+    Instance.new("UICorner", f).CornerRadius = UDim.new(0, 6)
+    
+    local lbl = Instance.new("TextLabel", f)
+    lbl.Size = UDim2.new(1, -60, 1, 0)
+    lbl.Position = UDim2.new(0, 12, 0, 0)
+    lbl.BackgroundTransparency = 1
+    lbl.Text = v
+    lbl.Font = Enum.Font.GothamSemibold
+    lbl.TextSize = 11
+    lbl.TextColor3 = T.White
+    lbl.TextXAlignment = Enum.TextXAlignment.Left
+    
+    local btn = Instance.new("TextButton", f)
+    btn.Size = UDim2.new(0, 45, 0, 20)
+    btn.Position = UDim2.new(1, -50, 0.5, -10)
+    btn.BackgroundColor3 = userSettings.Whitelist[v] and T.Accent1 or T.Off
+    btn.Text = userSettings.Whitelist[v] and "ON" or "OFF"
+    btn.Font = Enum.Font.GothamBold
+    btn.TextSize = 9
+    btn.TextColor3 = T.White
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4)
+    
+    btn.MouseButton1Click:Connect(function()
+        userSettings.Whitelist[v] = not userSettings.Whitelist[v]
+        btn.BackgroundColor3 = userSettings.Whitelist[v] and T.Accent1 or T.Off
+        btn.Text = userSettings.Whitelist[v] and "ON" or "OFF"
+    end)
+end
 
 print("✅ AJGODZX PREMIUM LOADED!")
