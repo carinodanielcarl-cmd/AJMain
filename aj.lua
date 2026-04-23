@@ -164,6 +164,7 @@ StatusText.TextSize = 12
 StatusText.Font = Enum.Font.GothamMedium
 StatusText.TextXAlignment = Enum.TextXAlignment.Left
 
+-- [[ CONTENT AREA ]] --
 local Content = Instance.new("ScrollingFrame", Main)
 Content.Position = UDim2.new(0, 165, 0, 65)
 Content.Size = UDim2.new(1, -175, 1, -75)
