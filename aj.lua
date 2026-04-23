@@ -241,14 +241,24 @@ local function addLogEntry(data)
     Left.Position = UDim2.new(0, 12, 0, 0)
 
     local Name = Instance.new("TextLabel", Left)
-    Name.Size = UDim2.new(1, 0, 1, 0)
-    Name.Position = UDim2.new(0, 0, 0, 0)
+    Name.Size = UDim2.new(1, 0, 0.6, 0)
+    Name.Position = UDim2.new(0, 0, 0, 2)
     Name.BackgroundTransparency = 1
     Name.Font = Enum.Font.GothamBold
     Name.Text = (data.name or "Unknown")
     Name.TextColor3 = T.White
     Name.TextSize = 13
     Name.TextXAlignment = Enum.TextXAlignment.Left
+
+    local ValueLabel = Instance.new("TextLabel", Left)
+    ValueLabel.Size = UDim2.new(1, 0, 0.4, 0)
+    ValueLabel.Position = UDim2.new(0, 0, 0.6, -2)
+    ValueLabel.BackgroundTransparency = 1
+    ValueLabel.Font = Enum.Font.GothamMedium
+    ValueLabel.Text = formatNumber(data.value or 0) .. " · " .. (data.mutation or "Normal")
+    ValueLabel.TextColor3 = (data.tier == "Highlights") and T.HighlightC or T.MidlightC
+    ValueLabel.TextSize = 10
+    ValueLabel.TextXAlignment = Enum.TextXAlignment.Left
 
     local Right = Instance.new("Frame", LogItem)
     Right.BackgroundTransparency = 1
