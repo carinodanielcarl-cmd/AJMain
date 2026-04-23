@@ -105,8 +105,8 @@ Instance.new("UICorner", Sidebar).CornerRadius = UDim.new(0, 9)
 local filterButtons = {}
 
 local function applyFilter()
-    for _, btn in pairs(filterButtons) do
-        btn.UIStroke.Color = (userSettings.CurrentFilter == btn.FilterKey) and T.Accent1 or T.Off
+    for _, item in pairs(filterButtons) do
+        item.btn.UIStroke.Color = (userSettings.CurrentFilter == item.key) and T.Accent1 or T.Off
     end
     
     if not Content then return end
@@ -141,14 +141,13 @@ local function createFilterBtn(text, yPos, filterKey)
     local stroke = Instance.new("UIStroke", btn)
     stroke.Name = "UIStroke"
     stroke.Color = (filterKey == "all") and T.Accent1 or T.Off
-    btn.FilterKey = filterKey
     
     btn.MouseButton1Click:Connect(function()
         userSettings.CurrentFilter = filterKey
         applyFilter()
     end)
     
-    table.insert(filterButtons, btn)
+    table.insert(filterButtons, {btn = btn, key = filterKey})
     return btn
 end
 
