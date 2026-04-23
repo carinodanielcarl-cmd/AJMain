@@ -61,7 +61,6 @@ local T = {
 local userSettings = {
     AutoJoin = false,
     PlaySound = true,
-    CurrentFilter = "all"
 }
 
 -- [[ UI FOUNDATION ]] --
@@ -102,30 +101,6 @@ Sidebar.Position = UDim2.new(0, 0, 0, 65)
 Sidebar.Size = UDim2.new(0, 155, 1, -65)
 Instance.new("UICorner", Sidebar).CornerRadius = UDim.new(0, 9)
 
-local filterButtons = {}
-
-local function applyFilter()
-    for _, item in pairs(filterButtons) do
-        item.btn.UIStroke.Color = (userSettings.CurrentFilter == item.key) and T.Accent1 or T.Off
-    end
-    
-    if not Content then return end
-    for _, child in ipairs(Content:GetChildren()) do
-        if child:IsA("Frame") and child:GetAttribute("Tier") then
-            local tier = child:GetAttribute("Tier")
-            if userSettings.CurrentFilter == "all" then
-                child.Visible = true
-            elseif userSettings.CurrentFilter == "hl" and tier == "Highlights" then
-                child.Visible = true
-            elseif userSettings.CurrentFilter == "ml" and tier == "Midlights" then
-                child.Visible = true
-            else
-                child.Visible = false
-            end
-        end
-    end
-end
-
 local function createFilterBtn(text, yPos, filterKey)
     local btn = Instance.new("TextButton", Sidebar)
     btn.Position = UDim2.new(0, 10, 0, yPos)
@@ -137,17 +112,8 @@ local function createFilterBtn(text, yPos, filterKey)
     btn.TextSize = 12
     btn.TextXAlignment = Enum.TextXAlignment.Left
     Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
-    
     local stroke = Instance.new("UIStroke", btn)
-    stroke.Name = "UIStroke"
     stroke.Color = (filterKey == "all") and T.Accent1 or T.Off
-    
-    btn.MouseButton1Click:Connect(function()
-        userSettings.CurrentFilter = filterKey
-        applyFilter()
-    end)
-    
-    table.insert(filterButtons, {btn = btn, key = filterKey})
     return btn
 end
 
@@ -198,7 +164,6 @@ StatusText.TextSize = 12
 StatusText.Font = Enum.Font.GothamMedium
 StatusText.TextXAlignment = Enum.TextXAlignment.Left
 
--- [[ CONTENT AREA ]] --
 local Content = Instance.new("ScrollingFrame", Main)
 Content.Position = UDim2.new(0, 165, 0, 65)
 Content.Size = UDim2.new(1, -175, 1, -75)
@@ -261,14 +226,6 @@ local function addLogEntry(data)
     local LogItem = Instance.new("Frame", Content)
     LogItem.BackgroundColor3 = T.BgCard
     LogItem.Size = UDim2.new(1, -10, 0, 45)
-    LogItem:SetAttribute("Tier", data.tier or "Midlights")
-    
-    if userSettings.CurrentFilter == "hl" and LogItem:GetAttribute("Tier") ~= "Highlights" then
-        LogItem.Visible = false
-    elseif userSettings.CurrentFilter == "ml" and LogItem:GetAttribute("Tier") ~= "Midlights" then
-        LogItem.Visible = false
-    end
-    
     Instance.new("UICorner", LogItem).CornerRadius = UDim.new(0, 8)
     
     local bar = Instance.new("Frame", LogItem)
