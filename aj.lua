@@ -325,4 +325,90 @@ local function addLogEntry(data)
             setclipboard(data.job_id or "")
             copyBtn.Text = "✓ COPIED"
             task.wait(1)
-            copyBtn.Text = "📋
+            copyBtn.Text = "📋 COPY"
+        end
+    end)
+    
+    -- Animate
+    card.BackgroundTransparency = 1
+    card:TweenPosition(UDim2.new(1, 50, 0, 0), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.3, true)
+    task.wait(0.1)
+    card:TweenPosition(UDim2.new(0, 0, 0, 0), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.3, true)
+    card.BackgroundTransparency = 0
+    
+    playNotifSound()
+    StatusText.Text = string.format("Found: %s • %s", data.name, formatNumber(data.value))
+    task.wait(3)
+    if StatusText.Text ~= "Connected • Monitoring..." then
+        StatusText.Text = "Connected • Monitoring..."
+    end
+end
+
+-- [[ DATA SYNC LOOP with AUTO-CLEAN ]] --
+local processedIds = {}
+local lastCleanup = tick()
+
+task.spawn(function()
+    while _G.AJRunning do
+        pcall(function()
+            local response = game:HttpGet(SHARED_URL .. "?t=" .. tick())
+            local data = HttpService:JSONDecode(response)
+            
+            if data and data.findings then
+                -- AUTO-CLEAN: If more than MAX_LOGS, clean it
+                if #data.findings > MAX_LOGS then
+                    while #data.findings > MAX_LOGS do
+                        table.remove(data.findings)
+                    end
+                    -- Post cleaned data back
+                    local body = HttpService:JSONEncode(data)
+                    local requestFunc = syn and syn.request or request or http_request
+                    if requestFunc then
+                        requestFunc({
+                            Url = SHARED_URL,
+                            Method = "POST",
+                            Headers = {["Content-Type"] = "application/json"},
+                            Body = body
+                        })
+                    end
+                end
+                
+                -- Process findings
+                for i = #data.findings, 1, -1 do
+                    local finding = data.findings[i]
+                    if finding and finding.id and not processedIds[finding.id] then
+                        processedIds[finding.id] = true
+                        addLogEntry(finding)
+                        
+                        if userSettings.AutoJoin then
+                            task.wait(0.3)
+                            local targetPlace = finding.place_id or 109983668079237
+                            pcall(function()
+                                TeleportService:TeleportToPlaceInstance(targetPlace, finding.job_id, lp)
+                            end)
+                            break
+                        end
+                    end
+                end
+            end
+            
+            -- Cleanup old IDs every 5 minutes
+            if tick() - lastCleanup > 300 then
+                local newIds = {}
+                local count = 0
+                for id, _ in pairs(processedIds) do
+                    if count < 100 then
+                        newIds[id] = true
+                        count = count + 1
+                    end
+                end
+                processedIds = newIds
+                lastCleanup = tick()
+            end
+        end)
+        
+        task.wait(1.5)
+    end
+end)
+
+print("✅ AJGODZX with Auto-Clean Loaded! (Keeps last " .. MAX_LOGS .. " logs)")
