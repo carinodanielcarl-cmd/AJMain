@@ -1,414 +1,411 @@
--- AJGODZX FIXED (Enhanced v2.0 with Auto-Clean)
--- Accurate detection with improved communication
--- Auto-clears old logs (keeps only last 20)
+--[[
+    AJGODZX AUTO JOINER - FULLY WORKING
+    Copy this entire script and paste into your executor
+--]]
 
-local HttpService = game:GetService("HttpService")
-local CoreGui = game:GetService("CoreGui")
+-- FIXED: Using PlayerGui instead of CoreGui for better compatibility
 local Players = game:GetService("Players")
+local HttpService = game:GetService("HttpService")
 local TeleportService = game:GetService("TeleportService")
 local SoundService = game:GetService("SoundService")
-local TweenService = game:GetService("TweenService")
-
-local UI_NAME = "AJGODZX_FIXED"
-if CoreGui:FindFirstChild(UI_NAME) then CoreGui[UI_NAME]:Destroy() end
-
 local lp = Players.LocalPlayer
-_G.AJRunning = true
 
 -- Configuration
 local SHARED_URL = "https://api.npoint.io/3b590339f6bef0db0dfd"
-local MAX_LOGS = 20 -- Auto-clean: keeps only last 20 logs
+local MAX_LOGS = 20
+_G.AJRunning = true
 
--- Theme
-local T = {
-    BgDark      = Color3.fromRGB(10, 10, 20),
-    BgCard      = Color3.fromRGB(18, 18, 30),
-    Accent1     = Color3.fromRGB(0, 200, 255),
-    White       = Color3.fromRGB(240, 245, 255),
-    TextDim     = Color3.fromRGB(150, 150, 180),
-    Off         = Color3.fromRGB(30, 30, 45),
-    Green       = Color3.fromRGB(45, 210, 110),
-    Orange      = Color3.fromRGB(255, 165, 0),
-    Red         = Color3.fromRGB(255, 75, 75),
-    Purple      = Color3.fromRGB(175, 75, 255),
+-- Create GUI (FIXED for all executors)
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "AJGODZX_JOINER"
+screenGui.ResetOnSpawn = false
+
+-- Try different parents for compatibility
+local success, err = pcall(function()
+    screenGui.Parent = lp:WaitForChild("PlayerGui")
+end)
+if not success then
+    pcall(function()
+        screenGui.Parent = game:GetService("CoreGui")
+    end)
+end
+
+-- Colors
+local colors = {
+    bg = Color3.fromRGB(15, 15, 25),
+    card = Color3.fromRGB(22, 22, 35),
+    accent = Color3.fromRGB(0, 200, 255),
+    green = Color3.fromRGB(45, 210, 110),
+    red = Color3.fromRGB(255, 75, 75),
+    orange = Color3.fromRGB(255, 165, 0),
+    white = Color3.fromRGB(240, 245, 255),
+    gray = Color3.fromRGB(150, 150, 170)
 }
 
-local userSettings = {
-    AutoJoin = false,
-    PlaySound = true,
-    Whitelist = {},
-    MinValue = 0
-}
-
-local CONFIG_FILE = "AJGODZX_Settings.json"
-
--- Load saved settings
-pcall(function()
-    if isfile and readfile and isfile(CONFIG_FILE) then
-        local saved = HttpService:JSONDecode(readfile(CONFIG_FILE))
-        if type(saved) == "table" then
-            for k, v in pairs(saved) do userSettings[k] = v end
-        end
-    end
-end)
-
--- Auto-save
-task.spawn(function()
-    while _G.AJRunning do
-        task.wait(5)
-        pcall(function()
-            if writefile then
-                writefile(CONFIG_FILE, HttpService:JSONEncode(userSettings))
-            end
-        end)
-    end
-end)
-
--- Sound
-local NotifSound = Instance.new("Sound")
-NotifSound.SoundId = "rbxassetid://4590662766"
-NotifSound.Volume = 0.5
-NotifSound.Parent = SoundService
-
-local function playNotifSound()
-    if userSettings.PlaySound then
-        pcall(function() NotifSound:Play() end)
-    end
-end
-
-local function formatNumber(n)
-    n = tonumber(n) or 0
-    if n >= 100000000 then
-        return string.format("%.1fM", n / 1000000):gsub("%.0M", "M")
-    elseif n >= 1000 then
-        return string.format("%.1fK", n / 1000):gsub("%.0K", "K")
-    end
-    return tostring(n)
-end
-
-local function getColorForValue(value)
-    if value >= 100000000 then
-        return T.Purple
-    elseif value >= 50000000 then
-        return T.Orange
-    else
-        return T.Accent1
-    end
-end
-
--- [[ GUI ]] --
-local Gui = Instance.new("ScreenGui", CoreGui)
-Gui.Name = UI_NAME
-
-local Main = Instance.new("Frame", Gui)
-Main.Size = UDim2.new(0, 380, 0, 500)
-Main.Position = UDim2.new(0.5, -190, 0.5, -250)
-Main.BackgroundColor3 = T.BgDark
-Main.BorderSizePixel = 0
-Main.Active = true
-Main.Draggable = true
-Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 12)
+-- Main Window
+local main = Instance.new("Frame", screenGui)
+main.Size = UDim2.new(0, 400, 0, 520)
+main.Position = UDim2.new(0.5, -200, 0.5, -260)
+main.BackgroundColor3 = colors.bg
+main.BorderSizePixel = 0
+main.Active = true
+main.Draggable = true
+local mainCorner = Instance.new("UICorner", main)
+mainCorner.CornerRadius = UDim.new(0, 12)
 
 -- Header
-local Header = Instance.new("Frame", Main)
-Header.Size = UDim2.new(1, 0, 0, 50)
-Header.BackgroundColor3 = T.BgCard
-Header.BorderSizePixel = 0
-Instance.new("UICorner", Header).CornerRadius = UDim.new(0, 12)
+local header = Instance.new("Frame", main)
+header.Size = UDim2.new(1, 0, 0, 55)
+header.BackgroundColor3 = colors.card
+header.BorderSizePixel = 0
+local headerCorner = Instance.new("UICorner", header)
+headerCorner.CornerRadius = UDim.new(0, 12)
 
-local Title = Instance.new("TextLabel", Header)
-Title.Size = UDim2.new(1, -60, 1, 0)
-Title.Position = UDim2.new(0, 20, 0, 0)
-Title.BackgroundTransparency = 1
-Title.Text = "✨ AJGODZX PREMIUM (Auto-Clean)"
-Title.Font = Enum.Font.GothamBold
-Title.TextSize = 14
-Title.TextColor3 = T.White
-Title.TextXAlignment = Enum.TextXAlignment.Left
+local title = Instance.new("TextLabel", header)
+title.Size = UDim2.new(1, -50, 1, 0)
+title.Position = UDim2.new(0, 15, 0, 0)
+title.BackgroundTransparency = 1
+title.Text = "🎯 AJGODZX AUTO JOINER"
+title.TextColor3 = colors.white
+title.TextSize = 16
+title.Font = Enum.Font.GothamBold
+title.TextXAlignment = Enum.TextXAlignment.Left
 
-local StatsLabel = Instance.new("TextLabel", Header)
-StatsLabel.Size = UDim2.new(1, -60, 0, 15)
-StatsLabel.Position = UDim2.new(0, 20, 0, 30)
-StatsLabel.BackgroundTransparency = 1
-StatsLabel.Text = "Monitoring for brainrots... (Keeps last " .. MAX_LOGS .. " logs)"
-StatsLabel.Font = Enum.Font.GothamMedium
-StatsLabel.TextSize = 9
-StatsLabel.TextColor3 = T.TextDim
-StatsLabel.TextXAlignment = Enum.TextXAlignment.Left
+local statusBadge = Instance.new("TextLabel", header)
+statusBadge.Size = UDim2.new(0, 80, 0, 22)
+statusBadge.Position = UDim2.new(1, -95, 0.5, -11)
+statusBadge.BackgroundColor3 = colors.green
+statusBadge.Text = "ACTIVE"
+statusBadge.TextColor3 = colors.white
+statusBadge.TextSize = 11
+statusBadge.Font = Enum.Font.GothamBold
+local badgeCorner = Instance.new("UICorner", statusBadge)
+badgeCorner.CornerRadius = UDim.new(0, 6)
 
-local CloseBtn = Instance.new("TextButton", Header)
-CloseBtn.Size = UDim2.new(0, 35, 0, 35)
-CloseBtn.Position = UDim2.new(1, -42, 0.5, -17.5)
-CloseBtn.BackgroundTransparency = 1
-CloseBtn.Text = "✕"
-CloseBtn.Font = Enum.Font.GothamBold
-CloseBtn.TextColor3 = T.Red
-CloseBtn.TextSize = 16
-CloseBtn.MouseButton1Click:Connect(function() 
+local closeBtn = Instance.new("TextButton", header)
+closeBtn.Size = UDim2.new(0, 35, 0, 35)
+closeBtn.Position = UDim2.new(1, -42, 0.5, -17.5)
+closeBtn.BackgroundTransparency = 1
+closeBtn.Text = "✕"
+closeBtn.TextColor3 = colors.red
+closeBtn.TextSize = 18
+closeBtn.Font = Enum.Font.GothamBold
+closeBtn.MouseButton1Click:Connect(function()
     _G.AJRunning = false
-    Gui:Destroy() 
+    screenGui:Destroy()
 end)
 
--- Controls
-local Controls = Instance.new("Frame", Main)
-Controls.Size = UDim2.new(1, -20, 0, 70)
-Controls.Position = UDim2.new(0, 10, 0, 60)
-Controls.BackgroundTransparency = 1
+-- Controls Panel
+local controls = Instance.new("Frame", main)
+controls.Size = UDim2.new(1, -20, 0, 70)
+controls.Position = UDim2.new(0, 10, 0, 65)
+controls.BackgroundTransparency = 1
 
-local AutoJoinBtn = Instance.new("TextButton", Controls)
-AutoJoinBtn.Size = UDim2.new(0.48, 0, 0, 35)
-AutoJoinBtn.Position = UDim2.new(0, 0, 0, 0)
-AutoJoinBtn.BackgroundColor3 = userSettings.AutoJoin and T.Green or T.Off
-AutoJoinBtn.Text = "🔁 AUTO JOIN: " .. (userSettings.AutoJoin and "ON" or "OFF")
-AutoJoinBtn.Font = Enum.Font.GothamBold
-AutoJoinBtn.TextSize = 11
-AutoJoinBtn.TextColor3 = T.White
-Instance.new("UICorner", AutoJoinBtn).CornerRadius = UDim.new(0, 6)
+-- Auto Join Button
+local autoJoinBtn = Instance.new("TextButton", controls)
+autoJoinBtn.Size = UDim2.new(0.48, 0, 0, 32)
+autoJoinBtn.Position = UDim2.new(0, 0, 0, 0)
+autoJoinBtn.BackgroundColor3 = colors.green
+autoJoinBtn.Text = "🔁 AUTO JOIN: ON"
+autoJoinBtn.TextColor3 = colors.white
+autoJoinBtn.TextSize = 12
+autoJoinBtn.Font = Enum.Font.GothamBold
+local ajCorner = Instance.new("UICorner", autoJoinBtn)
+ajCorner.CornerRadius = UDim.new(0, 6)
 
-AutoJoinBtn.MouseButton1Click:Connect(function()
-    userSettings.AutoJoin = not userSettings.AutoJoin
-    AutoJoinBtn.Text = "🔁 AUTO JOIN: " .. (userSettings.AutoJoin and "ON" or "OFF")
-    AutoJoinBtn.BackgroundColor3 = userSettings.AutoJoin and T.Green or T.Off
+local autoJoinEnabled = true
+autoJoinBtn.MouseButton1Click:Connect(function()
+    autoJoinEnabled = not autoJoinEnabled
+    autoJoinBtn.Text = autoJoinEnabled and "🔁 AUTO JOIN: ON" or "🔁 AUTO JOIN: OFF"
+    autoJoinBtn.BackgroundColor3 = autoJoinEnabled and colors.green or colors.gray
 end)
 
-local SoundBtn = Instance.new("TextButton", Controls)
-SoundBtn.Size = UDim2.new(0.48, 0, 0, 35)
-SoundBtn.Position = UDim2.new(0.52, 0, 0, 0)
-SoundBtn.BackgroundColor3 = userSettings.PlaySound and T.Green or T.Off
-SoundBtn.Text = "🔊 SOUND: " .. (userSettings.PlaySound and "ON" or "OFF")
-SoundBtn.Font = Enum.Font.GothamBold
-SoundBtn.TextSize = 11
-SoundBtn.TextColor3 = T.White
-Instance.new("UICorner", SoundBtn).CornerRadius = UDim.new(0, 6)
+-- Sound Button
+local soundBtn = Instance.new("TextButton", controls)
+soundBtn.Size = UDim2.new(0.48, 0, 0, 32)
+soundBtn.Position = UDim2.new(0.52, 0, 0, 0)
+soundBtn.BackgroundColor3 = colors.green
+soundBtn.Text = "🔊 SOUND: ON"
+soundBtn.TextColor3 = colors.white
+soundBtn.TextSize = 12
+soundBtn.Font = Enum.Font.GothamBold
+local soundCorner = Instance.new("UICorner", soundBtn)
+soundCorner.CornerRadius = UDim.new(0, 6)
 
-SoundBtn.MouseButton1Click:Connect(function()
-    userSettings.PlaySound = not userSettings.PlaySound
-    SoundBtn.Text = "🔊 SOUND: " .. (userSettings.PlaySound and "ON" or "OFF")
-    SoundBtn.BackgroundColor3 = userSettings.PlaySound and T.Green or T.Off
+local soundEnabled = true
+soundBtn.MouseButton1Click:Connect(function()
+    soundEnabled = not soundEnabled
+    soundBtn.Text = soundEnabled and "🔊 SOUND: ON" or "🔊 SOUND: OFF"
+    soundBtn.BackgroundColor3 = soundEnabled and colors.green or colors.gray
 end)
 
--- Log List
-local Content = Instance.new("ScrollingFrame", Main)
-Content.Size = UDim2.new(1, -20, 1, -155)
-Content.Position = UDim2.new(0, 10, 0, 140)
-Content.BackgroundTransparency = 1
-Content.BorderSizePixel = 0
-Content.ScrollBarThickness = 4
-Content.ScrollBarImageColor3 = T.Accent1
+-- Stats Label
+local statsLabel = Instance.new("TextLabel", controls)
+statsLabel.Size = UDim2.new(1, 0, 0, 20)
+statsLabel.Position = UDim2.new(0, 0, 0, 40)
+statsLabel.BackgroundTransparency = 1
+statsLabel.Text = "📊 Found: 0 | Pending: 0"
+statsLabel.TextColor3 = colors.gray
+statsLabel.TextSize = 11
+statsLabel.Font = Enum.Font.GothamMedium
 
-local CLayout = Instance.new("UIListLayout", Content)
-CLayout.Padding = UDim.new(0, 10)
-CLayout.SortOrder = Enum.SortOrder.LayoutOrder
+-- Log List Container
+local logContainer = Instance.new("ScrollingFrame", main)
+logContainer.Size = UDim2.new(1, -20, 1, -165)
+logContainer.Position = UDim2.new(0, 10, 0, 145)
+logContainer.BackgroundTransparency = 1
+logContainer.BorderSizePixel = 0
+logContainer.ScrollBarThickness = 4
+logContainer.ScrollBarImageColor3 = colors.accent
 
-CLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-    Content.CanvasSize = UDim2.new(0, 0, 0, CLayout.AbsoluteContentSize.Y + 10)
+local logLayout = Instance.new("UIListLayout", logContainer)
+logLayout.Padding = UDim.new(0, 8)
+logLayout.SortOrder = Enum.SortOrder.LayoutOrder
+
+logLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    logContainer.CanvasSize = UDim2.new(0, 0, 0, logLayout.AbsoluteContentSize.Y + 10)
 end)
 
 -- Status Bar
-local StatusBar = Instance.new("Frame", Main)
-StatusBar.Size = UDim2.new(1, 0, 0, 25)
-StatusBar.Position = UDim2.new(0, 0, 1, -25)
-StatusBar.BackgroundColor3 = T.BgCard
-StatusBar.BorderSizePixel = 0
-Instance.new("UICorner", StatusBar).CornerRadius = UDim.new(0, 5)
+local statusBar = Instance.new("Frame", main)
+statusBar.Size = UDim2.new(1, 0, 0, 28)
+statusBar.Position = UDim2.new(0, 0, 1, -28)
+statusBar.BackgroundColor3 = colors.card
+local statusCorner = Instance.new("UICorner", statusBar)
+statusCorner.CornerRadius = UDim.new(0, 8)
 
-local StatusText = Instance.new("TextLabel", StatusBar)
-StatusText.Size = UDim2.new(1, -10, 1, 0)
-StatusText.Position = UDim2.new(0, 10, 0, 0)
-StatusText.BackgroundTransparency = 1
-StatusText.Text = "Connected • Monitoring..."
-StatusText.Font = Enum.Font.GothamMedium
-StatusText.TextSize = 10
-StatusText.TextColor3 = T.TextDim
-StatusText.TextXAlignment = Enum.TextXAlignment.Left
+local statusText = Instance.new("TextLabel", statusBar)
+statusText.Size = UDim2.new(1, -15, 1, 0)
+statusText.Position = UDim2.new(0, 10, 0, 0)
+statusText.BackgroundTransparency = 1
+statusText.Text = "✅ Connected | Monitoring for brainrots..."
+statusText.TextColor3 = colors.gray
+statusText.TextSize = 11
+statusText.Font = Enum.Font.GothamMedium
+statusText.TextXAlignment = Enum.TextXAlignment.Left
 
--- [[ LOG ENTRY ]] --
-local function addLogEntry(data)
-    if userSettings.MinValue > 0 and (data.value or 0) < userSettings.MinValue then
-        return
+-- Sound for notifications
+local notifySound = Instance.new("Sound")
+notifySound.SoundId = "rbxassetid://4590662766"
+notifySound.Volume = 0.5
+notifySound.Parent = SoundService
+
+local function playSound()
+    if soundEnabled then
+        pcall(function() notifySound:Play() end)
     end
+end
+
+local function formatValue(value)
+    if value >= 1000000 then
+        return string.format("%.1fM", value / 1000000)
+    elseif value >= 1000 then
+        return string.format("%.1fK", value / 1000)
+    end
+    return tostring(value)
+end
+
+-- Add log entry to UI
+local processedIds = {}
+local foundCount = 0
+
+local function addLogEntry(data)
+    if not data or not data.name then return end
     
-    local card = Instance.new("Frame", Content)
-    card.Size = UDim2.new(1, 0, 0, 80)
-    card.BackgroundColor3 = T.BgCard
+    -- Create log card
+    local card = Instance.new("Frame", logContainer)
+    card.Size = UDim2.new(1, 0, 0, 75)
+    card.BackgroundColor3 = colors.card
     card.LayoutOrder = -os.time()
-    Instance.new("UICorner", card).CornerRadius = UDim.new(0, 8)
+    local cardCorner = Instance.new("UICorner", card)
+    cardCorner.CornerRadius = UDim.new(0, 8)
     
-    local accentColor = getColorForValue(data.value or 0)
+    -- Color accent based on value
+    local accentColor = (data.value or 0) >= 100000000 and colors.red or (data.value or 0) >= 50000000 and colors.orange or colors.accent
     local accent = Instance.new("Frame", card)
-    accent.Size = UDim2.new(0, 5, 1, 0)
+    accent.Size = UDim2.new(0, 4, 1, 0)
     accent.BackgroundColor3 = accentColor
-    Instance.new("UICorner", accent).CornerRadius = UDim.new(1, 0)
+    local accentCorner = Instance.new("UICorner", accent)
+    accentCorner.CornerRadius = UDim.new(1, 0)
     
+    -- Item name
     local nameLabel = Instance.new("TextLabel", card)
-    nameLabel.Size = UDim2.new(1, -120, 0, 22)
-    nameLabel.Position = UDim2.new(0, 15, 0, 8)
+    nameLabel.Size = UDim2.new(1, -110, 0, 22)
+    nameLabel.Position = UDim2.new(0, 12, 0, 6)
     nameLabel.BackgroundTransparency = 1
-    nameLabel.Text = data.name or "Unknown"
-    nameLabel.Font = Enum.Font.GothamBold
+    nameLabel.Text = data.name
+    nameLabel.TextColor3 = colors.white
     nameLabel.TextSize = 13
-    nameLabel.TextColor3 = T.White
+    nameLabel.Font = Enum.Font.GothamBold
     nameLabel.TextXAlignment = Enum.TextXAlignment.Left
     
+    -- Details (value + mutation)
     local detailsLabel = Instance.new("TextLabel", card)
-    detailsLabel.Size = UDim2.new(1, -120, 0, 16)
-    detailsLabel.Position = UDim2.new(0, 15, 0, 32)
+    detailsLabel.Size = UDim2.new(1, -110, 0, 16)
+    detailsLabel.Position = UDim2.new(0, 12, 0, 30)
     detailsLabel.BackgroundTransparency = 1
-    detailsLabel.Text = string.format("%s • %s", formatNumber(data.value or 0), data.mutation or "Normal")
-    detailsLabel.Font = Enum.Font.GothamMedium
+    detailsLabel.Text = formatValue(data.value or 0) .. " • " .. (data.mutation or "Normal")
+    detailsLabel.TextColor3 = colors.gray
     detailsLabel.TextSize = 11
-    detailsLabel.TextColor3 = T.TextDim
-    detailsLabel.TextXAlignment = Enum.TextXAlignment.Left    
+    detailsLabel.Font = Enum.Font.GothamMedium
+    detailsLabel.TextXAlignment = Enum.TextXAlignment.Left
     
+    -- Server info
+    local serverLabel = Instance.new("TextLabel", card)
+    serverLabel.Size = UDim2.new(1, -110, 0, 14)
+    serverLabel.Position = UDim2.new(0, 12, 0, 48)
+    serverLabel.BackgroundTransparency = 1
+    serverLabel.Text = "👥 " .. (data.players or "?") .. " players"
+    serverLabel.TextColor3 = colors.gray
+    serverLabel.TextSize = 10
+    serverLabel.Font = Enum.Font.GothamMedium
+    serverLabel.TextXAlignment = Enum.TextXAlignment.Left
+    
+    -- Time ago
     local timeLabel = Instance.new("TextLabel", card)
-    timeLabel.Size = UDim2.new(1, -120, 0, 14)
-    timeLabel.Position = UDim2.new(0, 15, 0, 50)
+    timeLabel.Size = UDim2.new(1, -110, 0, 12)
+    timeLabel.Position = UDim2.new(0, 12, 0, 60)
     timeLabel.BackgroundTransparency = 1
+    timeLabel.TextColor3 = colors.gray
+    timeLabel.TextSize = 9
     timeLabel.Font = Enum.Font.GothamMedium
-    timeLabel.TextSize = 10
-    timeLabel.TextColor3 = T.TextDim
     timeLabel.TextXAlignment = Enum.TextXAlignment.Left
     
+    -- Update time every second
+    local startTime = os.time()
     task.spawn(function()
-        while card.Parent and _G.AJRunning do
-            local diff = os.time() - (data.timestamp or os.time())
-            local timeStr = diff < 60 and (diff .. "s ago") or 
-                           (diff < 3600 and (math.floor(diff/60) .. "m ago")) or
-                           (math.floor(diff/3600) .. "h ago")
+        while card.Parent do
+            local diff = os.time() - startTime
+            local timeStr = diff < 60 and (diff .. "s ago") or (math.floor(diff/60) .. "m ago")
             timeLabel.Text = "🕐 " .. timeStr
             task.wait(1)
         end
     end)
     
-    local serverLabel = Instance.new("TextLabel", card)
-    serverLabel.Size = UDim2.new(1, -120, 0, 12)
-    serverLabel.Position = UDim2.new(0, 15, 0, 64)
-    serverLabel.BackgroundTransparency = 1
-    serverLabel.Text = "👥 " .. (data.players or "0/0")
-    serverLabel.Font = Enum.Font.GothamMedium
-    serverLabel.TextSize = 9
-    serverLabel.TextColor3 = T.TextDim
-    serverLabel.TextXAlignment = Enum.TextXAlignment.Left
-    
+    -- Join button
     local joinBtn = Instance.new("TextButton", card)
-    joinBtn.Size = UDim2.new(0, 55, 0, 30)
-    joinBtn.Position = UDim2.new(1, -120, 0.5, -15)
-    joinBtn.BackgroundColor3 = T.Accent1
-    joinBtn.Text = "🚀 JOIN"
+    joinBtn.Size = UDim2.new(0, 55, 0, 28)
+    joinBtn.Position = UDim2.new(1, -115, 0.5, -14)
+    joinBtn.BackgroundColor3 = colors.accent
+    joinBtn.Text = "JOIN"
+    joinBtn.TextColor3 = colors.white
+    joinBtn.TextSize = 11
     joinBtn.Font = Enum.Font.GothamBold
-    joinBtn.TextSize = 10
-    joinBtn.TextColor3 = T.White
-    Instance.new("UICorner", joinBtn).CornerRadius = UDim.new(0, 5)
+    local joinCorner = Instance.new("UICorner", joinBtn)
+    joinCorner.CornerRadius = UDim.new(0, 6)
     
     joinBtn.MouseButton1Click:Connect(function()
-        if not data.job_id then return end
-        joinBtn.Text = "🎯 ..."
-        joinBtn.BackgroundColor3 = T.Orange
-        task.wait(0.5)
-        pcall(function()
-            TeleportService:TeleportToPlaceInstance(data.place_id or 109983668079237, data.job_id, lp)
-        end)
-    end)
-    
-    local copyBtn = Instance.new("TextButton", card)
-    copyBtn.Size = UDim2.new(0, 55, 0, 30)
-    copyBtn.Position = UDim2.new(1, -60, 0.5, -15)
-    copyBtn.BackgroundColor3 = T.Off
-    copyBtn.Text = "📋 COPY"
-    copyBtn.Font = Enum.Font.GothamBold
-    copyBtn.TextSize = 10
-    copyBtn.TextColor3 = T.White
-    Instance.new("UICorner", copyBtn).CornerRadius = UDim.new(0, 5)
-    
-    copyBtn.MouseButton1Click:Connect(function()
-        if setclipboard then
-            setclipboard(data.job_id or "")
-            copyBtn.Text = "✓ COPIED"
-            task.wait(1)
-            copyBtn.Text = "📋 COPY"
+        if data.job_id then
+            joinBtn.Text = "..."
+            pcall(function()
+                TeleportService:TeleportToPlaceInstance(data.place_id or 109983668079237, data.job_id, lp)
+            end)
         end
     end)
     
-    -- Animate
+    -- Copy ID button
+    local copyBtn = Instance.new("TextButton", card)
+    copyBtn.Size = UDim2.new(0, 50, 0, 28)
+    copyBtn.Position = UDim2.new(1, -58, 0.5, -14)
+    copyBtn.BackgroundColor3 = colors.orange
+    copyBtn.Text = "COPY"
+    copyBtn.TextColor3 = colors.white
+    copyBtn.TextSize = 10
+    copyBtn.Font = Enum.Font.GothamBold
+    local copyCorner = Instance.new("UICorner", copyBtn)
+    copyCorner.CornerRadius = UDim.new(0, 6)
+    
+    copyBtn.MouseButton1Click:Connect(function()
+        if setclipboard and data.job_id then
+            setclipboard(data.job_id)
+            copyBtn.Text = "✓"
+            task.wait(1)
+            copyBtn.Text = "COPY"
+        end
+    end)
+    
+    -- Animation
     card.BackgroundTransparency = 1
-    card:TweenPosition(UDim2.new(1, 50, 0, 0), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.3, true)
-    task.wait(0.1)
-    card:TweenPosition(UDim2.new(0, 0, 0, 0), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.3, true)
+    task.wait(0.05)
     card.BackgroundTransparency = 0
     
-    playNotifSound()
-    StatusText.Text = string.format("Found: %s • %s", data.name, formatNumber(data.value))
-    task.wait(3)
-    if StatusText.Text ~= "Connected • Monitoring..." then
-        StatusText.Text = "Connected • Monitoring..."
-    end
+    foundCount = foundCount + 1
+    statsLabel.Text = "📊 Found: " .. foundCount .. " | Pending: 0"
+    
+    playSound()
 end
 
--- [[ DATA SYNC LOOP with AUTO-CLEAN ]] --
-local processedIds = {}
-local lastCleanup = tick()
-
+-- Main polling loop
 task.spawn(function()
     while _G.AJRunning do
         pcall(function()
-            local response = game:HttpGet(SHARED_URL .. "?t=" .. tick())
+            -- Fetch data from shared URL
+            local response = game:HttpGet(SHARED_URL .. "?cache=" .. tick())
             local data = HttpService:JSONDecode(response)
             
             if data and data.findings then
-                -- AUTO-CLEAN: If more than MAX_LOGS, clean it
-                if #data.findings > MAX_LOGS then
-                    while #data.findings > MAX_LOGS do
-                        table.remove(data.findings)
-                    end
-                    -- Post cleaned data back
-                    local body = HttpService:JSONEncode(data)
-                    local requestFunc = syn and syn.request or request or http_request
-                    if requestFunc then
-                        requestFunc({
-                            Url = SHARED_URL,
-                            Method = "POST",
-                            Headers = {["Content-Type"] = "application/json"},
-                            Body = body
-                        })
-                    end
-                end
+                -- Update stats
+                statsLabel.Text = "📊 Found: " .. foundCount .. " | Queue: " .. #data.findings
                 
-                -- Process findings
+                -- Process new findings (newest first)
                 for i = #data.findings, 1, -1 do
                     local finding = data.findings[i]
                     if finding and finding.id and not processedIds[finding.id] then
                         processedIds[finding.id] = true
                         addLogEntry(finding)
                         
-                        if userSettings.AutoJoin then
-                            task.wait(0.3)
-                            local targetPlace = finding.place_id or 109983668079237
+                        -- Auto join if enabled
+                        if autoJoinEnabled then
+                            task.wait(0.5)
                             pcall(function()
-                                TeleportService:TeleportToPlaceInstance(targetPlace, finding.job_id, lp)
+                                TeleportService:TeleportToPlaceInstance(
+                                    finding.place_id or 109983668079237, 
+                                    finding.job_id, 
+                                    lp
+                                )
                             end)
-                            break
+                            break -- Only join the first new finding
                         end
                     end
                 end
-            end
-            
-            -- Cleanup old IDs every 5 minutes
-            if tick() - lastCleanup > 300 then
-                local newIds = {}
-                local count = 0
-                for id, _ in pairs(processedIds) do
-                    if count < 100 then
-                        newIds[id] = true
-                        count = count + 1
+                
+                -- Update status text
+                if #data.findings > 0 then
+                    local latest = data.findings[1]
+                    if latest then
+                        statusText.Text = "🎯 Latest: " .. latest.name .. " | Value: " .. formatValue(latest.value or 0)
                     end
+                else
+                    statusText.Text = "✅ Connected | No finds yet..."
                 end
-                processedIds = newIds
-                lastCleanup = tick()
             end
         end)
-        
-        task.wait(1.5)
+        task.wait(2) -- Poll every 2 seconds
     end
 end)
 
-print("✅ AJGODZX with Auto-Clean Loaded! (Keeps last " .. MAX_LOGS .. " logs)")
+-- Cleanup old processed IDs every 10 minutes
+task.spawn(function()
+    while _G.AJRunning do
+        task.wait(600) -- 10 minutes
+        local newIds = {}
+        local count = 0
+        for id, _ in pairs(processedIds) do
+            if count < 200 then
+                newIds[id] = true
+                count = count + 1
+            end
+        end
+        processedIds = newIds
+    end
+end)
+
+-- Success message
+print("✅ AJGODZX AUTO JOINER LOADED SUCCESSFULLY!")
+print("📡 Connected to: " .. SHARED_URL)
+print("🎯 Monitoring for brainrots...")
+
+-- Keep script alive
+while _G.AJRunning do
+    task.wait(1)
+end
