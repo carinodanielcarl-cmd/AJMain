@@ -1,5 +1,6 @@
--- AJGODZX FIXED (Enhanced v2.0)
+-- AJGODZX FIXED (Enhanced v2.0 with Auto-Clean)
 -- Accurate detection with improved communication
+-- Auto-clears old logs (keeps only last 20)
 
 local HttpService = game:GetService("HttpService")
 local CoreGui = game:GetService("CoreGui")
@@ -14,9 +15,11 @@ if CoreGui:FindFirstChild(UI_NAME) then CoreGui[UI_NAME]:Destroy() end
 local lp = Players.LocalPlayer
 _G.AJRunning = true
 
--- ═══════════════════════════════════
--- THEME & SETTINGS
--- ═══════════════════════════════════
+-- Configuration
+local SHARED_URL = "https://api.npoint.io/3b590339f6bef0db0dfd"
+local MAX_LOGS = 20 -- Auto-clean: keeps only last 20 logs
+
+-- Theme
 local T = {
     BgDark      = Color3.fromRGB(10, 10, 20),
     BgCard      = Color3.fromRGB(18, 18, 30),
@@ -34,26 +37,22 @@ local userSettings = {
     AutoJoin = false,
     PlaySound = true,
     Whitelist = {},
-    MinValue = 0 -- Minimum value to show
+    MinValue = 0
 }
 
 local CONFIG_FILE = "AJGODZX_Settings.json"
-local SHARED_URL = "https://api.npoint.io/3b590339f6bef0db0dfd"
-local WEBHOOK_URL = "https://discord.com/api/webhooks/1496851695848657009/OCOh6ewiAsYMsSwvC0T-chTbt_hVvm64jAt919t5rXlhE4FGyssoAA5adTTb_TR_dQHr"
 
 -- Load saved settings
 pcall(function()
-    if isfile and readfile then
-        if isfile(CONFIG_FILE) then
-            local saved = HttpService:JSONDecode(readfile(CONFIG_FILE))
-            if type(saved) == "table" then
-                for k, v in pairs(saved) do userSettings[k] = v end
-            end
+    if isfile and readfile and isfile(CONFIG_FILE) then
+        local saved = HttpService:JSONDecode(readfile(CONFIG_FILE))
+        if type(saved) == "table" then
+            for k, v in pairs(saved) do userSettings[k] = v end
         end
     end
 end)
 
--- Auto-save settings
+-- Auto-save
 task.spawn(function()
     while _G.AJRunning do
         task.wait(5)
@@ -65,7 +64,7 @@ task.spawn(function()
     end
 end)
 
--- [[ UTILITIES ]] --
+-- Sound
 local NotifSound = Instance.new("Sound")
 NotifSound.SoundId = "rbxassetid://4590662766"
 NotifSound.Volume = 0.5
@@ -97,47 +96,7 @@ local function getColorForValue(value)
     end
 end
 
--- Improved webhook sending
-local function sendWebhook(data)
-    if not WEBHOOK_URL or WEBHOOK_URL == "" then return end
-    
-    local colorValue = data.value >= 100000000 and 0xFF4B4B or 
-                      (data.value >= 50000000 and 0xFFA500 or 0x00C8FF)
-    
-    local payload = {
-        ["embeds"] = {{
-            ["title"] = "🎯 Brainrot Detected!",
-            ["description"] = string.format("**%s** was found in a server!", data.name),
-            ["color"] = colorValue,
-            ["fields"] = {
-                {["name"] = "📦 Item", ["value"] = "```" .. (data.name or "Unknown") .. "```", ["inline"] = true},
-                {["name"] = "💰 Value", ["value"] = "```" .. formatNumber(data.value or 0) .. " 💎```", ["inline"] = true},
-                {["name"] = "✨ Mutation", ["value"] = "```" .. (data.mutation or "Normal") .. "```", ["inline"] = true},
-                {["name"] = "👥 Players", ["value"] = "```" .. (data.players or "0/0") .. "```", ["inline"] = true},
-                {["name"] = "🎮 Server ID", ["value"] = "```" .. string.sub((data.job_id or ""), 1, 20) .. "...```", ["inline"] = false},
-                {["name"] = "🚀 Join Command", ["value"] = "```lua\ngame:GetService('TeleportService'):TeleportToPlaceInstance(" .. (data.place_id or 0) .. ", '" .. (data.job_id or "") .. "')\n```", ["inline"] = false}
-            },
-            ["footer"] = {["text"] = "AJGODZX v2.0 • Found at " .. os.date("%H:%M:%S")},
-            ["timestamp"] = os.date("!%Y-%m-%dT%H:%M:%SZ")
-        }}
-    }
-    
-    pcall(function()
-        local requestFunc = syn and syn.request or request or http_request
-        if requestFunc then
-            requestFunc({
-                Url = WEBHOOK_URL,
-                Method = "POST",
-                Headers = {["Content-Type"] = "application/json"},
-                Body = HttpService:JSONEncode(payload)
-            })
-        elseif HttpService and HttpService.PostAsync then
-            HttpService:PostAsync(WEBHOOK_URL, HttpService:JSONEncode(payload))
-        end
-    end)
-end
-
--- [[ GUI CONSTRUCTION ]] --
+-- [[ GUI ]] --
 local Gui = Instance.new("ScreenGui", CoreGui)
 Gui.Name = UI_NAME
 
@@ -161,9 +120,9 @@ local Title = Instance.new("TextLabel", Header)
 Title.Size = UDim2.new(1, -60, 1, 0)
 Title.Position = UDim2.new(0, 20, 0, 0)
 Title.BackgroundTransparency = 1
-Title.Text = "✨ AJGODZX PREMIUM v2.0"
+Title.Text = "✨ AJGODZX PREMIUM (Auto-Clean)"
 Title.Font = Enum.Font.GothamBold
-Title.TextSize = 16
+Title.TextSize = 14
 Title.TextColor3 = T.White
 Title.TextXAlignment = Enum.TextXAlignment.Left
 
@@ -171,9 +130,9 @@ local StatsLabel = Instance.new("TextLabel", Header)
 StatsLabel.Size = UDim2.new(1, -60, 0, 15)
 StatsLabel.Position = UDim2.new(0, 20, 0, 30)
 StatsLabel.BackgroundTransparency = 1
-StatsLabel.Text = "Monitoring for brainrots..."
+StatsLabel.Text = "Monitoring for brainrots... (Keeps last " .. MAX_LOGS .. " logs)"
 StatsLabel.Font = Enum.Font.GothamMedium
-StatsLabel.TextSize = 10
+StatsLabel.TextSize = 9
 StatsLabel.TextColor3 = T.TextDim
 StatsLabel.TextXAlignment = Enum.TextXAlignment.Left
 
@@ -190,7 +149,7 @@ CloseBtn.MouseButton1Click:Connect(function()
     Gui:Destroy() 
 end)
 
--- Controls Frame
+-- Controls
 local Controls = Instance.new("Frame", Main)
 Controls.Size = UDim2.new(1, -20, 0, 70)
 Controls.Position = UDim2.new(0, 10, 0, 60)
@@ -202,7 +161,7 @@ AutoJoinBtn.Position = UDim2.new(0, 0, 0, 0)
 AutoJoinBtn.BackgroundColor3 = userSettings.AutoJoin and T.Green or T.Off
 AutoJoinBtn.Text = "🔁 AUTO JOIN: " .. (userSettings.AutoJoin and "ON" or "OFF")
 AutoJoinBtn.Font = Enum.Font.GothamBold
-AutoJoinBtn.TextSize = 12
+AutoJoinBtn.TextSize = 11
 AutoJoinBtn.TextColor3 = T.White
 Instance.new("UICorner", AutoJoinBtn).CornerRadius = UDim.new(0, 6)
 
@@ -218,7 +177,7 @@ SoundBtn.Position = UDim2.new(0.52, 0, 0, 0)
 SoundBtn.BackgroundColor3 = userSettings.PlaySound and T.Green or T.Off
 SoundBtn.Text = "🔊 SOUND: " .. (userSettings.PlaySound and "ON" or "OFF")
 SoundBtn.Font = Enum.Font.GothamBold
-SoundBtn.TextSize = 12
+SoundBtn.TextSize = 11
 SoundBtn.TextColor3 = T.White
 Instance.new("UICorner", SoundBtn).CornerRadius = UDim.new(0, 6)
 
@@ -263,9 +222,8 @@ StatusText.TextSize = 10
 StatusText.TextColor3 = T.TextDim
 StatusText.TextXAlignment = Enum.TextXAlignment.Left
 
--- [[ LOG ENTRY CREATION ]] --
+-- [[ LOG ENTRY ]] --
 local function addLogEntry(data)
-    -- Filter by minimum value
     if userSettings.MinValue > 0 and (data.value or 0) < userSettings.MinValue then
         return
     end
@@ -276,14 +234,12 @@ local function addLogEntry(data)
     card.LayoutOrder = -os.time()
     Instance.new("UICorner", card).CornerRadius = UDim.new(0, 8)
     
-    -- Color accent based on value
     local accentColor = getColorForValue(data.value or 0)
     local accent = Instance.new("Frame", card)
     accent.Size = UDim2.new(0, 5, 1, 0)
     accent.BackgroundColor3 = accentColor
     Instance.new("UICorner", accent).CornerRadius = UDim.new(1, 0)
     
-    -- Item name
     local nameLabel = Instance.new("TextLabel", card)
     nameLabel.Size = UDim2.new(1, -120, 0, 22)
     nameLabel.Position = UDim2.new(0, 15, 0, 8)
@@ -294,7 +250,6 @@ local function addLogEntry(data)
     nameLabel.TextColor3 = T.White
     nameLabel.TextXAlignment = Enum.TextXAlignment.Left
     
-    -- Details
     local detailsLabel = Instance.new("TextLabel", card)
     detailsLabel.Size = UDim2.new(1, -120, 0, 16)
     detailsLabel.Position = UDim2.new(0, 15, 0, 32)
@@ -304,7 +259,7 @@ local function addLogEntry(data)
     detailsLabel.TextSize = 11
     detailsLabel.TextColor3 = T.TextDim
     detailsLabel.TextXAlignment = Enum.TextXAlignment.Left    
-    -- Time
+    
     local timeLabel = Instance.new("TextLabel", card)
     timeLabel.Size = UDim2.new(1, -120, 0, 14)
     timeLabel.Position = UDim2.new(0, 15, 0, 50)
@@ -314,7 +269,6 @@ local function addLogEntry(data)
     timeLabel.TextColor3 = T.TextDim
     timeLabel.TextXAlignment = Enum.TextXAlignment.Left
     
-    -- Update time
     task.spawn(function()
         while card.Parent and _G.AJRunning do
             local diff = os.time() - (data.timestamp or os.time())
@@ -326,7 +280,6 @@ local function addLogEntry(data)
         end
     end)
     
-    -- Server info
     local serverLabel = Instance.new("TextLabel", card)
     serverLabel.Size = UDim2.new(1, -120, 0, 12)
     serverLabel.Position = UDim2.new(0, 15, 0, 64)
@@ -337,7 +290,6 @@ local function addLogEntry(data)
     serverLabel.TextColor3 = T.TextDim
     serverLabel.TextXAlignment = Enum.TextXAlignment.Left
     
-    -- Join button
     local joinBtn = Instance.new("TextButton", card)
     joinBtn.Size = UDim2.new(0, 55, 0, 30)
     joinBtn.Position = UDim2.new(1, -120, 0.5, -15)
@@ -353,13 +305,11 @@ local function addLogEntry(data)
         joinBtn.Text = "🎯 ..."
         joinBtn.BackgroundColor3 = T.Orange
         task.wait(0.5)
-        
         pcall(function()
             TeleportService:TeleportToPlaceInstance(data.place_id or 109983668079237, data.job_id, lp)
         end)
     end)
     
-    -- Copy button
     local copyBtn = Instance.new("TextButton", card)
     copyBtn.Size = UDim2.new(0, 55, 0, 30)
     copyBtn.Position = UDim2.new(1, -60, 0.5, -15)
@@ -375,75 +325,4 @@ local function addLogEntry(data)
             setclipboard(data.job_id or "")
             copyBtn.Text = "✓ COPIED"
             task.wait(1)
-            copyBtn.Text = "📋 COPY"
-        end
-    end)
-    
-    -- Animate entry
-    card.BackgroundTransparency = 1
-    card:TweenPosition(UDim2.new(1, 50, 0, 0), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.3, true)
-    task.wait(0.1)
-    card:TweenPosition(UDim2.new(0, 0, 0, 0), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.3, true)
-    card.BackgroundTransparency = 0
-    
-    -- Send webhook and play sound
-    sendWebhook(data)
-    playNotifSound()
-    
-    -- Update status
-    StatusText.Text = string.format("Found: %s • %s", data.name, formatNumber(data.value))
-    task.wait(3)
-    if StatusText.Text ~= "Connected • Monitoring..." then
-        StatusText.Text = "Connected • Monitoring..."
-    end
-end
-
--- [[ DATA SYNC LOOP ]] --
-local processedIds = {}
-local lastSyncTime = 0
-
-task.spawn(function()
-    while _G.AJRunning do
-        pcall(function()
-            local response = game:HttpGet(SHARED_URL .. "?t=" .. tick())
-            local data = HttpService:JSONDecode(response)
-            
-            if data and data.findings then
-                -- Process newest findings first
-                for _, finding in ipairs(data.findings) do
-                    if not processedIds[finding.id] then
-                        processedIds[finding.id] = true
-                        addLogEntry(finding)
-                        
-                        -- Auto-join if enabled
-                        if userSettings.AutoJoin then
-                            task.wait(0.5) -- Small delay before auto-join
-                            local targetPlace = finding.place_id or 109983668079237
-                            pcall(function()
-                                TeleportService:TeleportToPlaceInstance(targetPlace, finding.job_id, lp)
-                            end)
-                            break -- Stop after first auto-join
-                        end
-                    end
-                end
-            end
-            
-            -- Clean old IDs periodically
-            if tick() - lastSyncTime > 300 then -- Every 5 minutes
-                local newProcessed = {}
-                for id, _ in pairs(processedIds) do
-                    -- Keep only last 100 IDs
-                    if #newProcessed < 100 then
-                        newProcessed[id] = true
-                    end
-                end
-                processedIds = newProcessed
-                lastSyncTime = tick()
-            end
-        end)
-        
-        task.wait(1.5) -- Faster polling
-    end
-end)
-
-print("✅ AJGODZX FIXED v2.0 LOADED!")
+            copyBtn.Text = "📋
